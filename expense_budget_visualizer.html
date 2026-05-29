@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Expense & Budget Visualizer</title>
+    
+    <!-- Premium Typography & Icons -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    
+    <!-- Chart.js for Visual Chart -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        /* Variabel CSS untuk Tema */
+        :root {
+            --bg-color: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-main: #0f172a;
+            --text-muted: #64748b;
+            --border-color: #e2e8f0;
+            --primary: #0f172a;
+            --primary-text: #ffffff;
+            --income: #10b981;
+            --expense: #f43f5e;
+            --radius: 20px;
+            --shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* Tema Mode Gelap */
+        html.dark {
+            --bg-color: #020617;
+            --card-bg: #0f172a;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #1e293b;
+            --primary: #f8fafc;
+            --primary-text: #0f172a;
+        }
+
+        /* Reset & Base Styles */
+        * { margin: 0; padding: 0; box-sizing: border-box; font-family: 'Plus Jakarta Sans', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); transition: var(--transition); min-height: 100vh; display: flex; justify-content: center; }
+
+        /* Container Mobile-First */
+        .app-container {
+            width: 100%;
+            max-width: 480px;
+            background-color: var(--bg-color);
+            min-height: 100vh;
+            position: relative;
+            padding: 1.5rem 1rem 6rem 1rem;
+        }
+
+        /* Header & Saldo */
+        .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .top-bar h1 { font-size: 1.25rem; font-weight: 700; }
+        .icon-btn { background: var(--card-bg); border: 1px solid var(--border-color); color: var(--text-main); width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: var(--transition); }
+
+        .balance-card {
+            background: var(--primary);
+            color: var(--primary-text);
+            border-radius: var(--radius);
+            padding: 1.5rem;
+            text-align: center;
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow);
+        }
+        .balance-label { font-size: 0.875rem; opacity: 0.8; margin-bottom: 0.25rem; text-transform: uppercase; letter-spacing: 1px; }
+        .balance-amount { font-size: 2.5rem; font-weight: 700; letter-spacing: -1px; }
+
+        /* Area Grafik */
+        .card { background: var(--card-bg); border-radius: var(--radius); padding: 1.25rem; border: 1px solid var(--border-color); box-shadow: var(--shadow); margin-bottom: 1.5rem; }
+        .section-title { font-size: 1.1rem; font-weight: 600; margin-bottom: 1rem; display: flex; align-items: center; justify-content: space-between; }
+        .chart-container { position: relative; height: 200px; width: 100%; }
+
+        /* Form & Input */
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-size: 0.85rem; font-weight: 500; color: var(--text-muted); }
+        .form-control { width: 100%; padding: 0.875rem 1rem; border: 1.5px solid var(--border-color); border-radius: 12px; background: transparent; color: var(--text-main); font-size: 0.95rem; transition: var(--transition); outline: none; appearance: none; }
+        .form-control:focus { border-color: var(--primary); }
+        
+        /* Tombol selebar layar untuk aksesibilitas (nyaman untuk pengguna kidal) */
+        .btn { display: inline-flex; align-items: center; justify-content: center; width: 100%; padding: 1rem; border: none; border-radius: 12px; background: var(--primary); color: var(--primary-text); font-weight: 600; font-size: 1rem; cursor: pointer; transition: var(--transition); gap: 0.5rem; }
+        .btn:hover { opacity: 0.9; transform: scale(0.98); }
+
+        /* Daftar Transaksi (Scrollable) */
+        .transaction-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+            max-height: 350px;
+            overflow-y: auto;
+            padding-right: 0.25rem;
+        }
+        .transaction-list::-webkit-scrollbar { width: 4px; }
+        .transaction-list::-webkit-scrollbar-thumb { background: var(--border-color); border-radius: 4px; }
+
+        .transaction-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 1rem;
+            background: var(--bg-color);
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        .tx-info { display: flex; flex-direction: column; gap: 0.15rem; flex: 1; }
+        .tx-title { font-weight: 600; font-size: 0.95rem; }
+        .tx-category { font-size: 0.75rem; color: var(--text-muted); background: var(--card-bg); padding: 2px 6px; border-radius: 4px; display: inline-block; width: fit-content; border: 1px solid var(--border-color); margin-top: 4px; }
+        .tx-amount { font-weight: 700; display: flex; align-items: center; gap: 0.75rem; font-size: 1.05rem; }
+        .tx-delete { background: #ffe4e6; border: none; color: var(--expense); cursor: pointer; width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; transition: var(--transition); }
+        html.dark .tx-delete { background: rgba(244, 63, 94, 0.2); }
+
+        /* Utilities */
+        .text-income { color: var(--income); }
+        .text-expense { color: var(--expense); }
+
+        /* Notifikasi Toast */
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--text-main); color: var(--bg-color); padding: 0.875rem 1.5rem; border-radius: 30px; font-weight: 500; font-size: 0.9rem; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); z-index: 1000; opacity: 0; visibility: hidden; transition: all 0.3s ease; display: flex; align-items: center; gap: 0.5rem; }
+        .toast.show { opacity: 1; visibility: visible; transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+
+    <div class="app-container">
+        
+        <!-- Header -->
+        <div class="top-bar">
+            <h1>Tracker</h1>
+            <button id="themeToggle" class="icon-btn" title="Toggle Dark Mode">
+                <i data-lucide="moon"></i>
+            </button>
+        </div>
+
+        <!-- Total Balance -->
+        <div class="balance-card">
+            <div class="balance-label">Total Balance</div>
+            <div class="balance-amount" id="totalBalance">Rp 0</div>
+        </div>
+
+        <!-- Expense Chart -->
+        <div class="card">
+            <h2 class="section-title">Expenses by Category</h2>
+            <div class="chart-container">
+                <canvas id="expenseChart"></canvas>
+            </div>
+            <div id="noDataMessage" style="display:none; text-align:center; color: var(--text-muted); padding: 2rem 0; font-size: 0.9rem;">
+                No expenses recorded yet.
+            </div>
+        </div>
+
+        <!-- Add Item Form -->
+        <div class="card">
+            <h2 class="section-title">Add Item</h2>
+            <form id="transactionForm">
+                
+                <div class="form-group">
+                    <label>Item Name</label>
+                    <input type="text" id="itemName" class="form-control" placeholder="e.g., Train Ticket, Coffee" required>
+                </div>
+
+                <div style="display: flex; gap: 1rem;">
+                    <div class="form-group" style="flex: 1;">
+                        <label>Amount (IDR)</label>
+                        <!-- type changed to text, inputmode added for mobile numpad -->
+                        <input type="text" id="itemAmount" class="form-control" placeholder="0" inputmode="numeric" required>
+                    </div>
+                    
+                    <div class="form-group" style="flex: 1;">
+                        <label>Category</label>
+                        <select id="itemCategory" class="form-control" required>
+                            <option value="Food">Food</option>
+                            <option value="Transport">Transport</option>
+                            <option value="Fun">Fun</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                     <label>Transaction Type</label>
+                     <select id="itemType" class="form-control">
+                         <option value="expense">Expense (-)</option>
+                         <option value="income">Income (+)</option>
+                     </select>
+                </div>
+
+                <button type="submit" class="btn">
+                    <i data-lucide="plus"></i> Add Transaction
+                </button>
+            </form>
+        </div>
+
+        <!-- Transaction List -->
+        <div class="card">
+            <h2 class="section-title">Recent Transactions 
+                <span style="font-size: 0.8rem; font-weight: normal; color: var(--text-muted);" id="itemCount">0 Items</span>
+            </h2>
+            <div class="transaction-list" id="transactionList">
+                <!-- Javascript will populate this -->
+            </div>
+        </div>
+
+    </div>
+
+    <!-- Success Toast Notification -->
+    <div id="toast" class="toast">
+        <i data-lucide="check-circle" style="width: 18px; height: 18px;"></i>
+        <span id="toastMsg">Success</span>
+    </div>
+
+    <script>
+        // --- 1. STATE (TEMPORARY DATA) ---
+        const state = {
+            transactions: [
+                { id: 1, type: 'income', name: 'Initial Balance', amount: 5000000, category: 'Income' },
+                { id: 2, type: 'expense', name: 'Train Ticket', amount: 50000, category: 'Transport' },
+                { id: 3, type: 'expense', name: 'Iced Coffee', amount: 35000, category: 'Food' },
+                { id: 4, type: 'expense', name: 'Movie Ticket', amount: 65000, category: 'Fun' }
+            ],
+            theme: 'light',
+            chartInstance: null
+        };
+
+        // Chart Color Palette
+        const chartColors = {
+            'Food': '#f43f5e',      // Rose
+            'Transport': '#3b82f6', // Blue
+            'Fun': '#8b5cf6',       // Purple
+            'Other': '#10b981'      // Emerald
+        };
+
+        // --- 2. UTILITY FUNCTIONS ---
+        // Native Javascript IDR formatter
+        const idrFormatter = new Intl.NumberFormat('id-ID', {
+            style: 'currency',
+            currency: 'IDR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0
+        });
+
+        // Show bottom toast notification
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            document.getElementById('toastMsg').textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // --- 3. UI RENDERING ---
+        
+        function renderBalance() {
+            let balance = 0;
+            state.transactions.forEach(tx => {
+                if (tx.type === 'income') balance += tx.amount;
+                else balance -= tx.amount;
+            });
+            document.getElementById('totalBalance').textContent = idrFormatter.format(balance);
+        }
+
+        function renderChart() {
+            const expenses = state.transactions.filter(t => t.type === 'expense');
+            const canvas = document.getElementById('expenseChart');
+            const noData = document.getElementById('noDataMessage');
+
+            if (expenses.length === 0) {
+                canvas.style.display = 'none';
+                noData.style.display = 'block';
+                return;
+            }
+
+            canvas.style.display = 'block';
+            noData.style.display = 'none';
+
+            // Group data by category
+            const categoryData = {};
+            expenses.forEach(e => {
+                categoryData[e.category] = (categoryData[e.category] || 0) + e.amount;
+            });
+
+            const labels = Object.keys(categoryData);
+            const data = Object.values(categoryData);
+            const bgColors = labels.map(label => chartColors[label] || chartColors['Other']);
+
+            // Get text color based on light/dark mode
+            const textColor = getComputedStyle(document.documentElement).getPropertyValue('--text-main').trim() || '#0f172a';
+
+            if (state.chartInstance) {
+                state.chartInstance.data.labels = labels;
+                state.chartInstance.data.datasets[0].data = data;
+                state.chartInstance.data.datasets[0].backgroundColor = bgColors;
+                state.chartInstance.data.datasets[0].borderColor = getComputedStyle(document.documentElement).getPropertyValue('--card-bg');
+                state.chartInstance.options.plugins.legend.labels.color = textColor;
+                state.chartInstance.update();
+            } else {
+                const ctx = canvas.getContext('2d');
+                state.chartInstance = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: bgColors,
+                            borderWidth: 2,
+                            borderColor: getComputedStyle(document.documentElement).getPropertyValue('--card-bg'),
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        cutout: '65%',
+                        plugins: {
+                            legend: {
+                                position: 'right',
+                                labels: { 
+                                    color: textColor,
+                                    usePointStyle: true,
+                                    padding: 20,
+                                    font: { family: "'Plus Jakarta Sans', sans-serif", size: 12 }
+                                }
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.label || '';
+                                        if (label) label += ': ';
+                                        label += idrFormatter.format(context.raw);
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+
+        function renderTransactionList() {
+            const container = document.getElementById('transactionList');
+            document.getElementById('itemCount').textContent = `${state.transactions.length} Items`;
+            container.innerHTML = '';
+
+            if (state.transactions.length === 0) {
+                container.innerHTML = '<p style="text-align: center; color: var(--text-muted); font-size: 0.875rem; padding: 1rem 0;">No transactions yet.</p>';
+                return;
+            }
+
+            // Show newest first
+            const sortedTxs = [...state.transactions].reverse();
+
+            sortedTxs.forEach(tx => {
+                const isIncome = tx.type === 'income';
+                const el = document.createElement('div');
+                el.className = 'transaction-item';
+                el.innerHTML = `
+                    <div class="tx-info">
+                        <span class="tx-title">${tx.name}</span>
+                        <span class="tx-category">${tx.category}</span>
+                    </div>
+                    <div class="tx-amount ${isIncome ? 'text-income' : 'text-expense'}">
+                        ${isIncome ? '+' : '-'}${idrFormatter.format(tx.amount)}
+                        <button class="tx-delete" onclick="deleteTransaction(${tx.id})" title="Delete Item">
+                            <i data-lucide="x" style="width: 16px; height: 16px;"></i>
+                        </button>
+                    </div>
+                `;
+                container.appendChild(el);
+            });
+            lucide.createIcons();
+        }
+
+        function renderApp() {
+            renderBalance();
+            renderChart();
+            renderTransactionList();
+        }
+
+        // --- 4. ACTIONS & EVENT LISTENERS ---
+
+        // Auto-formatting IDR nominal while typing
+        const amountInput = document.getElementById('itemAmount');
+        amountInput.addEventListener('input', function(e) {
+            // Remove all non-numeric characters
+            let rawValue = this.value.replace(/[^0-9]/g, '');
+            
+            if(rawValue === '') {
+                this.value = '';
+                return;
+            }
+            
+            // Add dot every 3 digits (thousands separator)
+            this.value = rawValue.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        });
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            
+            const name = document.getElementById('itemName').value.trim();
+            const type = document.getElementById('itemType').value;
+            let category = document.getElementById('itemCategory').value;
+
+            // Remove thousands separator dots before calculating
+            const rawAmountString = document.getElementById('itemAmount').value.replace(/\./g, '');
+            const amount = parseFloat(rawAmountString);
+
+            if (!name || isNaN(amount) || amount <= 0) {
+                showToast('Please fill out the form correctly.');
+                return;
+            }
+
+            if(type === 'income') category = 'Income'; 
+
+            const newTx = {
+                id: Date.now(),
+                type,
+                name,
+                amount,
+                category
+            };
+
+            state.transactions.push(newTx);
+            renderApp();
+            showToast('Item added successfully');
+            
+            // Clear form after input
+            document.getElementById('itemName').value = '';
+            document.getElementById('itemAmount').value = '';
+        }
+
+        window.deleteTransaction = function(id) {
+            state.transactions = state.transactions.filter(tx => tx.id !== id);
+            renderApp();
+            showToast('Item deleted');
+        };
+
+        function toggleTheme() {
+            state.theme = state.theme === 'light' ? 'dark' : 'light';
+            document.documentElement.classList.toggle('dark', state.theme === 'dark');
+            
+            const iconName = state.theme === 'light' ? 'moon' : 'sun';
+            document.getElementById('themeToggle').innerHTML = `<i data-lucide="${iconName}"></i>`;
+            lucide.createIcons();
+
+            if(state.chartInstance) {
+                state.chartInstance.destroy();
+                state.chartInstance = null;
+                renderChart();
+            }
+        }
+
+        document.getElementById('itemType').addEventListener('change', function(e) {
+            const catSelect = document.getElementById('itemCategory');
+            if(e.target.value === 'income') {
+                catSelect.innerHTML = '<option value="Income">Income</option>';
+            } else {
+                catSelect.innerHTML = `
+                    <option value="Food">Food</option>
+                    <option value="Transport">Transport</option>
+                    <option value="Fun">Fun</option>
+                `;
+            }
+        });
+
+        // --- 5. INITIALIZATION ---
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('transactionForm').addEventListener('submit', handleFormSubmit);
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+            
+            lucide.createIcons();
+            renderApp();
+        });
+    </script>
+</body>
+</html>
